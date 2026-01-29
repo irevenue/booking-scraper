@@ -53,11 +53,14 @@ class BookingScraper {
       // Build search URL
       const searchUrl = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}&checkin=${checkInStr}&checkout=${checkOutStr}&group_adults=${adults}&no_rooms=1&group_children=0`;
 
-      // 3. Update the Goto logic (Remove the setUserAgent line that caused the error)
-      await this.page.goto(searchUrl, {
-        waitUntil: 'commit', // 'commit' is the fastest and least likely to timeout
-        timeout: 60000
-      });
+      // 1. Navigate with a more relaxed wait condition
+      await this.page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+      // 2. Check if we got blocked by a Captcha
+      const content = await this.page.content();
+      if (content.includes("Press and hold") || content.includes("captcha")) {
+        throw new Error("BLOCKED_BY_CAPTCHA");
+      }
 
       // Handle cookie consent if present
       await this.handleCookieConsent();
@@ -65,28 +68,13 @@ class BookingScraper {
       // Wait a bit for dynamic content
       await this.page.waitForTimeout(3000);
 
-      // Try multiple selectors (Booking.com changes these frequently)
-      const selectors = [
-        '[data-testid="property-card"]',
-        '[data-testid="title"]',
-        '.sr_property_block',
-        '[data-testid="property-card-container"]'
-      ];
-
-      let selectorFound = false;
-      for (const selector of selectors) {
-        try {
-          await this.page.waitForSelector(selector, { timeout: 10000 });
-          console.log(`Found hotels using selector: ${selector}`);
-          selectorFound = true;
-          break;
-        } catch (e) {
-          console.log(`Selector ${selector} not found, trying next...`);
-        }
-      }
-
-      if (!selectorFound) {
-        throw new Error('Could not find any hotel listings on the page');
+      // 3. Wait for the hotel cards, but don't crash if they are missing
+      try {
+        // Booking.com main selector
+        await this.page.waitForSelector('[data-testid="property-card"]', { timeout: 15000 });
+      } catch (e) {
+        console.log("No hotels found on this page.");
+        return []; // Return empty array instead of throwing an error
       }
 
       // Extract hotel data
@@ -105,16 +93,25 @@ class BookingScraper {
     try {
       console.log(`Scraping property: ${propertyUrl}`);
 
-      await this.page.goto(propertyUrl, {
-        waitUntil: 'commit', // 'commit' is the fastest and least likely to timeout
-        timeout: 60000
-      });
+      // 1. Navigate with a more relaxed wait condition
+      await this.page.goto(propertyUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+      // 2. Check if we got blocked by a Captcha
+      const content = await this.page.content();
+      if (content.includes("Press and hold") || content.includes("captcha")) {
+        throw new Error("BLOCKED_BY_CAPTCHA");
+      }
 
       // Handle cookie consent if present
       await this.handleCookieConsent();
 
-      // Wait for property details to load
-      await this.page.waitForSelector('[data-testid="property-card"]', { timeout: this.timeout });
+      // 3. Wait for the hotel cards, but don't crash if they are missing
+      try {
+        await this.page.waitForSelector('[data-testid="property-card"]', { timeout: 15000 });
+      } catch (e) {
+        console.log("No property details found on this page.");
+        return []; // Return empty array instead of throwing an error
+      }
 
       // Extract hotel data
       const hotels = await this.extractHotels();
