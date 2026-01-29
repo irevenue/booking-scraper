@@ -14,8 +14,17 @@ class BookingScraper {
       args: ['--disable-blink-features=AutomationControlled']
     });
 
+    // 1. Define your human-like User Agents
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+    ];
+    const selectedAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+
+    // 2. APPLY when creating the context (This is the Playwright way)
     const context = await this.browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      userAgent: selectedAgent,
       viewport: { width: 1920, height: 1080 }
     });
 
@@ -44,18 +53,10 @@ class BookingScraper {
       // Build search URL
       const searchUrl = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}&checkin=${checkInStr}&checkout=${checkOutStr}&group_adults=${adults}&no_rooms=1&group_children=0`;
 
-      // Improved "Stealth" logic
-      const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
-      ];
-
-      await this.page.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)]);
-
+      // 3. Update the Goto logic (Remove the setUserAgent line that caused the error)
       await this.page.goto(searchUrl, {
-        waitUntil: 'domcontentloaded', // Faster: only waits for the HTML, not the ads/trackers
-        timeout: 60000                 // Increases limit to 60 seconds
+        waitUntil: 'commit', // 'commit' is the fastest and least likely to timeout
+        timeout: 60000
       });
 
       // Handle cookie consent if present
@@ -104,18 +105,9 @@ class BookingScraper {
     try {
       console.log(`Scraping property: ${propertyUrl}`);
 
-      // Improved "Stealth" logic
-      const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
-      ];
-
-      await this.page.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)]);
-
       await this.page.goto(propertyUrl, {
-        waitUntil: 'domcontentloaded', // Faster: only waits for the HTML, not the ads/trackers
-        timeout: 60000                 // Increases limit to 60 seconds
+        waitUntil: 'commit', // 'commit' is the fastest and least likely to timeout
+        timeout: 60000
       });
 
       // Handle cookie consent if present
