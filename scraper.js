@@ -44,13 +44,37 @@ class BookingScraper {
       // Build search URL
       const searchUrl = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}&checkin=${checkInStr}&checkout=${checkOutStr}&group_adults=${adults}&no_rooms=1&group_children=0`;
       
-      await this.page.goto(searchUrl, { waitUntil: 'networkidle', timeout: this.timeout });
+      await this.page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       
       // Handle cookie consent if present
       await this.handleCookieConsent();
       
-      // Wait for results to load
-      await this.page.waitForSelector('[data-testid="property-card"]', { timeout: this.timeout });
+      // Wait a bit for dynamic content
+      await this.page.waitForTimeout(3000);
+      
+      // Try multiple selectors (Booking.com changes these frequently)
+      const selectors = [
+        '[data-testid="property-card"]',
+        '[data-testid="title"]',
+        '.sr_property_block',
+        '[data-testid="property-card-container"]'
+      ];
+      
+      let selectorFound = false;
+      for (const selector of selectors) {
+        try {
+          await this.page.waitForSelector(selector, { timeout: 10000 });
+          console.log(`Found hotels using selector: ${selector}`);
+          selectorFound = true;
+          break;
+        } catch (e) {
+          console.log(`Selector ${selector} not found, trying next...`);
+        }
+      }
+      
+      if (!selectorFound) {
+        throw new Error('Could not find any hotel listings on the page');
+      }
       
       // Extract hotel data
       const hotels = await this.extractHotels();
@@ -103,22 +127,41 @@ class BookingScraper {
   async extractHotels() {
     return await this.page.evaluate(() => {
       const hotels = [];
-      const propertyCards = document.querySelectorAll('[data-testid="property-card"]');
+      
+      // Try multiple selectors for property cards
+      let propertyCards = document.querySelectorAll('[data-testid="property-card"]');
+      if (propertyCards.length === 0) {
+        propertyCards = document.querySelectorAll('[data-testid="property-card-container"]');
+      }
+      if (propertyCards.length === 0) {
+        propertyCards = document.querySelectorAll('.sr_property_block');
+      }
       
       propertyCards.forEach((card) => {
         try {
           const hotel = {};
           
-          // Name
-          const nameEl = card.querySelector('[data-testid="title"]');
+          // Name - try multiple selectors
+          let nameEl = card.querySelector('[data-testid="title"]');
+          if (!nameEl) nameEl = card.querySelector('h3');
+          if (!nameEl) nameEl = card.querySelector('.sr-hotel__name');
           hotel.name = nameEl ? nameEl.textContent.trim() : 'N/A';
           
           // Link
-          const linkEl = card.querySelector('a[data-testid="title-link"]');
-          hotel.url = linkEl ? 'https://www.booking.com' + linkEl.getAttribute('href') : 'N/A';
+          let linkEl = card.querySelector('a[data-testid="title-link"]');
+          if (!linkEl) linkEl = card.querySelector('a[href*="/hotel/"]');
+          if (linkEl && linkEl.getAttribute('href')) {
+            const href = linkEl.getAttribute('href');
+            hotel.url = href.startsWith('http') ? href : 'https://www.booking.com' + href;
+          } else {
+            hotel.url = 'N/A';
+          }
           
-          // Price
-          const priceEl = card.querySelector('[data-testid="price-and-discounted-price"]');
+          // Price - try multiple selectors
+          let priceEl = card.querySelector('[data-testid="price-and-discounted-price"]');
+          if (!priceEl) priceEl = card.querySelector('[data-testid="price"]');
+          if (!priceEl) priceEl = card.querySelector('.prco-valign-middle-helper');
+          
           if (priceEl) {
             const priceText = priceEl.textContent.trim();
             hotel.price = priceText;
@@ -141,11 +184,13 @@ class BookingScraper {
           }
           
           // Rating
-          const ratingEl = card.querySelector('[data-testid="review-score"] div[aria-label*="Scored"]');
+          let ratingEl = card.querySelector('[data-testid="review-score"] div[aria-label*="Scored"]');
+          if (!ratingEl) ratingEl = card.querySelector('.bui-review-score__badge');
           hotel.rating = ratingEl ? ratingEl.textContent.trim() : 'N/A';
           
           // Number of reviews
-          const reviewsEl = card.querySelector('[data-testid="review-score"] div:nth-child(2)');
+          let reviewsEl = card.querySelector('[data-testid="review-score"] div:nth-child(2)');
+          if (!reviewsEl) reviewsEl = card.querySelector('.bui-review-score__text');
           if (reviewsEl) {
             const reviewText = reviewsEl.textContent.trim();
             const reviewMatch = reviewText.match(/([\d,]+)/);
@@ -155,7 +200,8 @@ class BookingScraper {
           }
           
           // Distance from center
-          const distanceEl = card.querySelector('[data-testid="distance"]');
+          let distanceEl = card.querySelector('[data-testid="distance"]');
+          if (!distanceEl) distanceEl = card.querySelector('.sr_card_address_line');
           if (distanceEl) {
             const distanceText = distanceEl.textContent.trim();
             hotel.distanceFromCenter = distanceText;
@@ -168,14 +214,19 @@ class BookingScraper {
           }
           
           // Address/Location
-          const addressEl = card.querySelector('[data-testid="address"]');
+          let addressEl = card.querySelector('[data-testid="address"]');
+          if (!addressEl) addressEl = card.querySelector('.sr_card_address');
           hotel.address = addressEl ? addressEl.textContent.trim() : 'N/A';
           
           // Image
-          const imageEl = card.querySelector('img[data-testid="image"]');
-          hotel.image = imageEl ? imageEl.getAttribute('src') : 'N/A';
+          let imageEl = card.querySelector('img[data-testid="image"]');
+          if (!imageEl) imageEl = card.querySelector('img');
+          hotel.image = imageEl ? (imageEl.getAttribute('src') || imageEl.getAttribute('data-src') || 'N/A') : 'N/A';
           
-          hotels.push(hotel);
+          // Only add if we got at least a name
+          if (hotel.name !== 'N/A') {
+            hotels.push(hotel);
+          }
         } catch (error) {
           console.error('Error extracting hotel data:', error);
         }
