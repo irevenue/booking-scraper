@@ -13,13 +13,13 @@ class BookingScraper {
       headless: this.headless,
       args: ['--disable-blink-features=AutomationControlled']
     });
-    this.page = await this.browser.newPage();
     
-    // Set realistic user agent
-    await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    const context = await this.browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 }
+    });
     
-    // Set viewport
-    await this.page.setViewportSize({ width: 1920, height: 1080 });
+    this.page = await context.newPage();
   }
 
   async searchCity(city, checkIn = null, checkOut = null, adults = 2) {
