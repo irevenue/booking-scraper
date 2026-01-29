@@ -14,7 +14,16 @@ class BookingScraper {
   async init() {
     this.browser = await chromium.launch({
       headless: this.headless,
-      args: ['--disable-blink-features=AutomationControlled']
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
     });
 
     // 1. Define your human-like User Agents
