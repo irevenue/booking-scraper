@@ -1,0 +1,31 @@
+{
+  "name": "booking-scraper",
+  "version": "1.0.0",
+  "description": "Full-featured Booking.com hotel scraper with discount tracking and n8n integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "scrape": "node scraper.js",
+    "dev": "nodemon server.js",
+    "install-browser": "npx playwright install chromium"
+  },
+  "keywords": [
+    "booking",
+    "scraper",
+    "hotels",
+    "n8n",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "playwright": "^1.40.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
