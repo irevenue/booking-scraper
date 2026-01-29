@@ -406,3 +406,4 @@ MIT License - Use freely for personal and commercial projects
 ---
 
 **Made with ❤️ for automated travel planning**
+# booking-scraper
